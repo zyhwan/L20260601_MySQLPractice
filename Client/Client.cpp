@@ -31,6 +31,9 @@ std::queue<int> KeyBuffer;
 std::mutex SessionLock;
 std::mutex KeyBufferLock;
 
+
+bool Login = false;
+
 void Render(SDL_Renderer* MyRender)
 {
 	if (!MyRender) return;
@@ -67,9 +70,27 @@ void ProcessPacket(SOCKET ProcessSocket, const char* InBuffer)
 
 	switch (UserPacketData->data_type())
 	{
+	case UserPacket::PacketType_S2C_Register:
+	{
+		auto RegisterData = UserPacketData->data_as_S2C_Register();
+		if (RegisterData->success())
+		{
+			cout << "회원가입 성공!" << endl;
+		}
+		else
+		{
+			cout << "아이디가 중복됩니다." << endl;
+		}
+	}
+	break;
 	case UserPacket::PacketType_S2C_Login:
 	{
 		MyClientID = UserPacketData->data_as_S2C_Login()->clientsocket_id();
+		cout << UserPacketData->data_as_S2C_Login()->message() << endl;
+		{
+			lock_guard<std::mutex> lock(SessionLock);
+			Login = UserPacketData->data_as_S2C_Login()->success();
+		}
 	}
 	break;
 	case UserPacket::PacketType_S2C_Spawn:
@@ -210,38 +231,86 @@ int SDL_main(int argc, char* argv[])
 
 	std::cout << "client connect" << endl;
 
-	string user_id{};
-	string password{};
-
-	cout << "User_id : " << endl;
-	cin >> user_id;
-
-	cout << "Password : " << endl;
-	cin >> password;
-
-	flatbuffers::FlatBufferBuilder SendBuilder;
-	auto C2S_LoginData = UserPacket::CreateC2S_Login(
-		SendBuilder,
-		SendBuilder.CreateString(user_id),
-		SendBuilder.CreateString(password),
-		SendBuilder.CreateString("1as3f356dsd6gyhg")
-	);
-
-	auto UserPacketData = UserPacket::CreatePacketData(
-		SendBuilder,
-		UserPacket::PacketType_C2S_Login,
-		C2S_LoginData.Union()
-	);
-
-	SendBuilder.Finish(UserPacketData);
-
-	SendAll(ServerSocket, SendBuilder);
-
 	HANDLE ThreadHandles[2] = { 0, };
 
 	//nonblocking, asynchrous
 	ThreadHandles[0] = (HANDLE)_beginthreadex(0, 0, RecvThread, &ServerSocket, /*CREATE_SUSPENDED*/0, 0);
 	ThreadHandles[1] = (HANDLE)_beginthreadex(0, 0, SendThread, &ServerSocket, /*CREATE_SUSPENDED*/0, 0);
+
+	while (!Login)
+	{
+		int num{};
+
+		cout << "1.Login / 2.Signup ";
+		cin >> num;
+
+		if (num == 1)
+		{
+			string user_id{};
+			string password{};
+
+			cout << "User_id : " << endl;
+			cin >> user_id;
+
+			cout << "Password : " << endl;
+			cin >> password;
+
+			flatbuffers::FlatBufferBuilder SendBuilder{};
+			auto C2S_LoginData = UserPacket::CreateC2S_Login(
+				SendBuilder,
+				SendBuilder.CreateString(user_id),
+				SendBuilder.CreateString(password),
+				SendBuilder.CreateString("1as3f356dsd6gyhg")
+			);
+
+			auto UserPacketData = UserPacket::CreatePacketData(
+				SendBuilder,
+				UserPacket::PacketType_C2S_Login,
+				C2S_LoginData.Union()
+			);
+
+			SendBuilder.Finish(UserPacketData);
+
+			SendAll(ServerSocket, SendBuilder);
+			
+			Sleep(100);
+		}
+		else if (num == 2)
+		{
+			string user_id{};
+			string password{};
+			string name{};
+
+			cout << "사용할 User_id : " << endl;
+			cin >> user_id;
+
+			cout << "사용할 Password : " << endl;
+			cin >> password;
+
+			cout << "사용할 이름 : " << endl;
+			cin >> name;
+
+			flatbuffers::FlatBufferBuilder SendBuilder{};
+			auto C2S_RegisterData = UserPacket::CreateC2S_Register(
+				SendBuilder,
+				SendBuilder.CreateString(user_id),
+				SendBuilder.CreateString(password),
+				SendBuilder.CreateString(name)
+			);
+
+			auto UserPacketData = UserPacket::CreatePacketData(
+				SendBuilder,
+				UserPacket::PacketType_C2S_Register,
+				C2S_RegisterData.Union()
+			);
+
+			SendBuilder.Finish(UserPacketData);
+
+			SendAll(ServerSocket, SendBuilder);
+
+			Sleep(100);
+		}
+	}
 
 	const Uint8* KeyState = SDL_GetKeyboardState(NULL);
 

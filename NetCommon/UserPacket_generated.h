@@ -304,7 +304,8 @@ struct S2C_Login FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef S2C_LoginBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_CLIENTSOCKET_ID = 4,
-    VT_MESSAGE = 6
+    VT_MESSAGE = 6,
+    VT_SUCCESS = 8
   };
   uint16_t clientsocket_id() const {
     return GetField<uint16_t>(VT_CLIENTSOCKET_ID, 0);
@@ -312,12 +313,16 @@ struct S2C_Login FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *message() const {
     return GetPointer<const ::flatbuffers::String *>(VT_MESSAGE);
   }
+  bool success() const {
+    return GetField<uint8_t>(VT_SUCCESS, 0) != 0;
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint16_t>(verifier, VT_CLIENTSOCKET_ID, 2) &&
            VerifyOffset(verifier, VT_MESSAGE) &&
            verifier.VerifyString(message()) &&
+           VerifyField<uint8_t>(verifier, VT_SUCCESS, 1) &&
            verifier.EndTable();
   }
 };
@@ -331,6 +336,9 @@ struct S2C_LoginBuilder {
   }
   void add_message(::flatbuffers::Offset<::flatbuffers::String> message) {
     fbb_.AddOffset(S2C_Login::VT_MESSAGE, message);
+  }
+  void add_success(bool success) {
+    fbb_.AddElement<uint8_t>(S2C_Login::VT_SUCCESS, static_cast<uint8_t>(success), 0);
   }
   explicit S2C_LoginBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -346,22 +354,26 @@ struct S2C_LoginBuilder {
 inline ::flatbuffers::Offset<S2C_Login> CreateS2C_Login(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint16_t clientsocket_id = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> message = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> message = 0,
+    bool success = false) {
   S2C_LoginBuilder builder_(_fbb);
   builder_.add_message(message);
   builder_.add_clientsocket_id(clientsocket_id);
+  builder_.add_success(success);
   return builder_.Finish();
 }
 
 inline ::flatbuffers::Offset<S2C_Login> CreateS2C_LoginDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint16_t clientsocket_id = 0,
-    const char *message = nullptr) {
+    const char *message = nullptr,
+    bool success = false) {
   auto message__ = message ? _fbb.CreateString(message) : 0;
   return UserPacket::CreateS2C_Login(
       _fbb,
       clientsocket_id,
-      message__);
+      message__,
+      success);
 }
 
 struct S2C_Spawn FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -794,14 +806,14 @@ struct C2S_Register FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef C2S_RegisterBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_USER_ID = 4,
-    VT_PASSWORD = 6,
+    VT_USER_PW = 6,
     VT_NAME = 8
   };
   const ::flatbuffers::String *user_id() const {
     return GetPointer<const ::flatbuffers::String *>(VT_USER_ID);
   }
-  const ::flatbuffers::String *password() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_PASSWORD);
+  const ::flatbuffers::String *user_pw() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_USER_PW);
   }
   const ::flatbuffers::String *name() const {
     return GetPointer<const ::flatbuffers::String *>(VT_NAME);
@@ -811,8 +823,8 @@ struct C2S_Register FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_USER_ID) &&
            verifier.VerifyString(user_id()) &&
-           VerifyOffset(verifier, VT_PASSWORD) &&
-           verifier.VerifyString(password()) &&
+           VerifyOffset(verifier, VT_USER_PW) &&
+           verifier.VerifyString(user_pw()) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
            verifier.EndTable();
@@ -826,8 +838,8 @@ struct C2S_RegisterBuilder {
   void add_user_id(::flatbuffers::Offset<::flatbuffers::String> user_id) {
     fbb_.AddOffset(C2S_Register::VT_USER_ID, user_id);
   }
-  void add_password(::flatbuffers::Offset<::flatbuffers::String> password) {
-    fbb_.AddOffset(C2S_Register::VT_PASSWORD, password);
+  void add_user_pw(::flatbuffers::Offset<::flatbuffers::String> user_pw) {
+    fbb_.AddOffset(C2S_Register::VT_USER_PW, user_pw);
   }
   void add_name(::flatbuffers::Offset<::flatbuffers::String> name) {
     fbb_.AddOffset(C2S_Register::VT_NAME, name);
@@ -846,11 +858,11 @@ struct C2S_RegisterBuilder {
 inline ::flatbuffers::Offset<C2S_Register> CreateC2S_Register(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> user_id = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> password = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> user_pw = 0,
     ::flatbuffers::Offset<::flatbuffers::String> name = 0) {
   C2S_RegisterBuilder builder_(_fbb);
   builder_.add_name(name);
-  builder_.add_password(password);
+  builder_.add_user_pw(user_pw);
   builder_.add_user_id(user_id);
   return builder_.Finish();
 }
@@ -858,15 +870,15 @@ inline ::flatbuffers::Offset<C2S_Register> CreateC2S_Register(
 inline ::flatbuffers::Offset<C2S_Register> CreateC2S_RegisterDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *user_id = nullptr,
-    const char *password = nullptr,
+    const char *user_pw = nullptr,
     const char *name = nullptr) {
   auto user_id__ = user_id ? _fbb.CreateString(user_id) : 0;
-  auto password__ = password ? _fbb.CreateString(password) : 0;
+  auto user_pw__ = user_pw ? _fbb.CreateString(user_pw) : 0;
   auto name__ = name ? _fbb.CreateString(name) : 0;
   return UserPacket::CreateC2S_Register(
       _fbb,
       user_id__,
-      password__,
+      user_pw__,
       name__);
 }
 

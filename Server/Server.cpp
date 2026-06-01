@@ -61,7 +61,45 @@ bool DB_Login(const string& user_id, const string& user_PW)
 	}
 }
 
+bool DB_Register(const string& user_id, const string& user_PW, const string& user_name)
+{
+	//중복 아이디 체크
+	{
+		sql::SQLString CheckQuery =
+			"select count(*) as cnt from membership.user where `user_id` = ?";
 
+		sql::PreparedStatement* MyPreparedStatement = MyConnection->prepareStatement(CheckQuery);
+		MyPreparedStatement->setString(1, user_id);
+
+		sql::ResultSet* result = MyPreparedStatement->executeQuery();
+		result->next();
+		int cnt = result->getInt("cnt");
+
+		delete result;
+		delete MyPreparedStatement;
+
+		if (cnt > 0)
+		{
+			return false;	// 이미 존재하는 아이디
+		}
+	}
+
+	// 중복이 없다면 삽입
+	{
+		sql::SQLString InsertQuery =
+			"insert into membership.user (`user_id`, `user_pw`, `name`, `is_delete`, `create_at`) "
+			"values (?, sha2(?, 512), ?, 'N', now())";
+
+		sql::PreparedStatement* MyPreparedStatement = MyConnection->prepareStatement(InsertQuery);
+		MyPreparedStatement->setString(1, user_id);
+		MyPreparedStatement->setString(2, user_PW);
+		MyPreparedStatement->setString(3, user_name);
+		MyPreparedStatement->executeUpdate();
+
+		delete MyPreparedStatement;
+	}
+	return true;
+}
 
 void DisconnectSocket(SOCKET DisconnectedSocket, fd_set* Sockets)
 {
@@ -113,16 +151,68 @@ void ProcessPacket(SOCKET ProcessSocket, const char* InBuffer)
 {
 	auto UserPacketData = UserPacket::GetPacketData(InBuffer);
 
+	string user_id{};
+	string user_pw{};
+	string user_name{};
+
 	switch (UserPacketData->data_type())
 	{
+	case UserPacket::PacketType_C2S_Register:
+	{
+		auto RegisterData = UserPacketData->data_as_C2S_Register();
+
+		user_id = RegisterData->user_id()->c_str();
+		user_pw = RegisterData->user_pw()->c_str();
+		user_name = RegisterData->name()->c_str();
+
+		bool Register = DB_Register(user_id, user_pw, user_name);
+
+		if (!Register)
+		{
+			cout << "중복되는 아이디입니다." << endl;
+			flatbuffers::FlatBufferBuilder builder;
+			auto S2C_LoginData = UserPacket::CreateS2C_Register(
+				builder,
+				false,
+				builder.CreateString("중복되는 아이디입니다.")
+			);
+			auto Packet = UserPacket::CreatePacketData(
+				builder,
+				UserPacket::PacketType_S2C_Register,
+				S2C_LoginData.Union()
+			);
+			builder.Finish(Packet);
+			SendAll(ProcessSocket, builder);
+			break;
+		}
+		else
+		{
+			cout << "회원가입이 완료되었습니다." << endl;
+			flatbuffers::FlatBufferBuilder builder;
+			auto S2C_LoginData = UserPacket::CreateS2C_Register(
+				builder,
+				true,
+				builder.CreateString("회원가입이 완료되었습니다.")
+			);
+			auto Packet = UserPacket::CreatePacketData(
+				builder,
+				UserPacket::PacketType_S2C_Register,
+				S2C_LoginData.Union()
+			);
+			builder.Finish(Packet);
+			SendAll(ProcessSocket, builder);
+			break;
+		}
+	}
+		break;
 	case UserPacket::PacketType_C2S_Login:
 	{
 		auto LoginData = UserPacketData->data_as_C2S_Login();
 
-		string UserID = LoginData->user_id()->c_str();
-		string Password = LoginData->user_pw()->c_str();
+		user_id = LoginData->user_id()->c_str();
+		user_pw = LoginData->user_pw()->c_str();
 
-		bool login = DB_Login(UserID, Password);
+		bool login = DB_Login(user_id, user_pw);
 
 		//틀렸을 경우.
 		if (!login)
@@ -131,7 +221,8 @@ void ProcessPacket(SOCKET ProcessSocket, const char* InBuffer)
 			auto S2C_LoginData = UserPacket::CreateS2C_Login(
 				builder,
 				0,
-				builder.CreateString("아이디 또는 비밀번호가 틀렸습니다.")
+				builder.CreateString("아이디 또는 비밀번호가 틀렸습니다."),
+				false
 			);
 			auto Packet = UserPacket::CreatePacketData(
 				builder,
@@ -163,7 +254,8 @@ void ProcessPacket(SOCKET ProcessSocket, const char* InBuffer)
 			auto S2C_LoginData = UserPacket::CreateS2C_Login(
 				builder,
 				(uint16_t)ProcessSocket,
-				builder.CreateString("Welcome.")
+				builder.CreateString("Welcome."),
+				true
 			);
 			auto UserPacketData = UserPacket::CreatePacketData(
 				builder,

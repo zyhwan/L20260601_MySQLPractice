@@ -20,6 +20,7 @@ table C2S_Login{
 table S2C_Login{
 	clientsocket_id:uint16;
 	message:string;
+	success:bool;
 }
 
 table S2C_Spawn{
@@ -62,7 +63,7 @@ table S2C_ChangeColor {
 
 table C2S_Register {
 	user_id : string;
-	password : string;
+	user_pw : string;
 	name : string;
 }
 
