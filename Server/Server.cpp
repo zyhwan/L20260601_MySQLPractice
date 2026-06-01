@@ -66,7 +66,7 @@ bool DB_Register(const string& user_id, const string& user_PW, const string& use
 	//중복 아이디 체크
 	{
 		sql::SQLString CheckQuery =
-			"select count(*) as cnt from membership.user where `user_id` = ?";
+			"select count(*) as cnt from user where `user_id` = ?";
 
 		sql::PreparedStatement* MyPreparedStatement = MyConnection->prepareStatement(CheckQuery);
 		MyPreparedStatement->setString(1, user_id);
@@ -87,7 +87,7 @@ bool DB_Register(const string& user_id, const string& user_PW, const string& use
 	// 중복이 없다면 삽입
 	{
 		sql::SQLString InsertQuery =
-			"insert into membership.user (`user_id`, `user_pw`, `name`, `is_delete`, `create_at`) "
+			"insert into `user` (`user_id`, `user_pw`, `name`, `is_delete`, `create_at`) "
 			"values (?, sha2(?, 512), ?, 'N', now())";
 
 		sql::PreparedStatement* MyPreparedStatement = MyConnection->prepareStatement(InsertQuery);
